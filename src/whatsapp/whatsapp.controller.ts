@@ -7,6 +7,11 @@ export class WhatsappController {
 
   @Post('session')
   async startSession(@Body('userId') userId: string) {
+    if (!userId || userId === '') {
+      return {
+        message: 'O userId não pode ser vazio',
+      };
+    }
     const { qrCode, isReady } =
       await this.whatsappService.initializeClient(userId);
     if (isReady) {
@@ -16,7 +21,8 @@ export class WhatsappController {
       };
     }
     return {
-      message: 'Sessão do WhatsApp iniciada para o usuário',
+      message:
+        'Iniciando sessão do WhatsApp para o usuário, favor scanear o QR code',
       userId,
       qrCode,
     };
@@ -82,5 +88,35 @@ export class WhatsappController {
     }
     await this.whatsappService.logout(userId);
     return { message: 'Usuário deslogado com sucesso' };
+  }
+
+  @Post('send-messages')
+  async sendMessages(
+    @Body('userId') userId: string,
+    @Body('contacts') contacts: string[],
+    @Body('message') message: string,
+  ) {
+    const isConnected = await this.whatsappService.userIsReady(userId);
+    if (!isConnected) {
+      return {
+        message: 'Usuário não está em sessão',
+        userId,
+      };
+    }
+    this.whatsappService.sendMessagesToContacts(userId, contacts, message);
+    return {
+      message: 'Mensagens estão sendo enviadas.',
+      userId,
+    };
+  }
+
+  @Get('status/:userId')
+  async getStatus(@Param('userId') userId: string) {
+    const isConnected = await this.whatsappService.userIsReady(userId);
+
+    return {
+      status: isConnected ? 'true' : 'false',
+      userId,
+    };
   }
 }

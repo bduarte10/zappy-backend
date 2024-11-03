@@ -67,12 +67,93 @@ export class WhatsappService {
           reject(new Error('Authentication failure'));
         });
 
-        client.on('disconnected', (reason) => {
+        client.on('disconnected', async (reason) => {
           console.log('Client was logged out', reason);
+          // Limpar cliente e QR code
           this.clients.delete(userId);
+          this.qrCodes.delete(userId);
+
+          // Aguardar antes de tentar limpar os arquivos
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          try {
+            const sessionPath = path.resolve(
+              __dirname,
+              '..',
+              'sessions',
+              userId,
+            );
+            await this.cleanSessionDirectory(sessionPath);
+          } catch (error) {
+            console.error('Erro ao limpar sessão após desconexão:', error);
+          }
         });
       },
     );
+  }
+  private async cleanSessionDirectory(sessionPath: string) {
+    try {
+      if (
+        !(await new Promise((resolve) => {
+          fs.access(sessionPath, (err) => {
+            resolve(!err);
+          });
+        }))
+      ) {
+        return;
+      }
+
+      const deleteFile = async (filePath: string) => {
+        for (let attempts = 0; attempts < 3; attempts++) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              fs.unlink(filePath, (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
+            });
+            break;
+          } catch (error) {
+            if (attempts === 2)
+              console.error(`Não foi possível deletar ${filePath}:`, error);
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+          }
+        }
+      };
+
+      const files = await fs.promises.readdir(sessionPath, {
+        withFileTypes: true,
+      });
+
+      for (const file of files) {
+        const fullPath = path.join(sessionPath, file.name);
+        if (file.isDirectory()) {
+          await this.cleanSessionDirectory(fullPath);
+          await new Promise<void>((resolve, reject) => {
+            fs.rmdir(fullPath, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          }).catch(() => {});
+          await new Promise<void>((resolve, reject) => {
+            fs.rmdir(sessionPath, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          }).catch(() => {});
+          await deleteFile(fullPath);
+        }
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        fs.rmdir(sessionPath, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      }).catch(() => {});
+    } catch (error) {
+      console.error('Erro ao limpar diretório de sessão:', error);
+    }
   }
   async userIsReady(userId: string) {
     return this.isConected.get(userId);
@@ -113,11 +194,6 @@ export class WhatsappService {
     return contacts;
   }
 
-  async sendMessage(userId: string, to: string, message: string) {
-    const { client } = await this.initializeClient(userId);
-    await client.sendMessage(to, message);
-  }
-
   async getMessages(userId: string) {
     const { client } = await this.initializeClient(userId);
     const chats = await client.getChats();
@@ -156,5 +232,46 @@ export class WhatsappService {
       this.clients.delete(userId);
       this.qrCodes.delete(userId);
     }
+  }
+  async sendMessagesToContacts(
+    userId: string,
+    contacts: string[],
+    message: string,
+  ) {
+    const { client } = await this.initializeClient(userId);
+
+    for (const contact of contacts) {
+      // Inicia o envio das mensagens em paralelo sem bloquear
+      this.sendMessageWithRandomDelay(client, contact, message);
+    }
+  }
+
+  // Função auxiliar para enviar mensagem com atraso randômico
+  private async sendMessageWithRandomDelay(
+    client: Client,
+    contact: string,
+    message: string,
+  ) {
+    console.log(`Enviando mensagem para ${contact}...`);
+    // Gera um atraso randômico entre 20 e 90 segundos
+    const minDelay = 1000; // 20 segundos
+    const maxDelay = 90000; // 1 minuto e 30 segundos
+    const delay =
+      Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+    // Aguardar o atraso randômico
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    // Enviar a mensagem
+    client
+      .sendMessage(contact, message)
+      .then(() => {
+        console.log(
+          `Mensagem enviada para ${contact} após ${delay / 1000} segundos.`,
+        );
+      })
+      .catch((error) => {
+        console.error(`Erro ao enviar mensagem para ${contact}:`, error);
+      });
   }
 }
