@@ -6,39 +6,33 @@ import * as fs from 'fs';
 
 @Injectable()
 export class WhatsappService {
-  private clients: Map<string, Client> = new Map();
-  private qrCodes: Map<string, string> = new Map();
-  private isConected: Map<string, boolean> = new Map();
+  private client: Client;
+  private qrCode: string;
+  private isConnected: boolean = false;
 
-  // Inicializa o cliente WhatsApp para o usuário especificado
-  async initializeClient(
-    userId: string,
-  ): Promise<{ client: Client; qrCode?: string; isReady?: boolean }> {
-    const existentClient = this.clients.get(userId);
-    const isReady = existentClient?.info?.wid ? true : false;
-    if (isReady) {
+  // Inicializa o cliente WhatsApp
+  async initializeClient(): Promise<{
+    client: Client;
+    qrCode?: string;
+    isReady?: boolean;
+  }> {
+    if (this.client && this.isConnected) {
+      console.log('Cliente já inicializado');
       return {
-        client: existentClient,
-        isReady,
-      };
-    }
-    if (this.clients.has(userId)) {
-      return {
-        client: this.clients.get(userId),
-        qrCode: this.qrCodes.get(userId),
-        isReady,
+        client: this.client,
+        isReady: true,
       };
     }
 
-    const sessionPath = path.resolve(__dirname, '..', 'sessions', userId);
+    const sessionPath = path.resolve(__dirname, '..', 'session');
 
     // Criar diretório se ele não existir
     if (!fs.existsSync(sessionPath)) {
       fs.mkdirSync(sessionPath, { recursive: true });
     }
 
-    const client = new Client({
-      authStrategy: new LocalAuth({ clientId: userId, dataPath: sessionPath }),
+    this.client = new Client({
+      authStrategy: new LocalAuth({ dataPath: sessionPath }),
       puppeteer: {
         headless: true,
         args: [
@@ -48,54 +42,44 @@ export class WhatsappService {
           '--disable-accelerated-2d-canvas',
           '--no-first-run',
           '--no-zygote',
-          '--single-process', // <- this one doesn't works in Windows
           '--disable-gpu',
         ],
       },
     });
 
-    this.clients.set(userId, client);
-
-    return new Promise<{ client: Client; qrCode?: string }>(
+    return new Promise<{ client: Client; qrCode?: string; isReady?: boolean }>(
       (resolve, reject) => {
-        client.initialize();
+        this.client.initialize();
 
-        client.on('qr', (qr) => {
-          console.log(`QR code for user ${userId}:`);
+        this.client.on('qr', (qr) => {
+          console.log('QR code gerado:');
           qrcode.generate(qr, { small: true });
-          this.qrCodes.set(userId, qr);
+          this.qrCode = qr;
           // Retorna o QR code imediatamente para o usuário
-          resolve({ client, qrCode: qr });
+          resolve({ client: this.client, qrCode: qr, isReady: false });
         });
 
-        client.on('ready', () => {
-          console.log(`WhatsApp is ready for user ${userId}!`);
-          this.isConected.set(userId, true);
-          this.qrCodes.delete(userId);
-          resolve({ client });
+        this.client.on('ready', () => {
+          console.log('WhatsApp está pronto!');
+          this.isConnected = true;
+          this.qrCode = null;
+          resolve({ client: this.client, isReady: true });
         });
 
-        client.on('auth_failure', (msg) => {
-          console.error('Authentication failure:', msg);
-          reject(new Error('Authentication failure'));
+        this.client.on('auth_failure', (msg) => {
+          console.error('Falha na autenticação:', msg);
+          reject(new Error('Falha na autenticação'));
         });
 
-        client.on('disconnected', async (reason) => {
-          console.log('Client was logged out', reason);
-          // Limpar cliente e QR code
-          this.clients.delete(userId);
-          this.qrCodes.delete(userId);
+        this.client.on('disconnected', async (reason) => {
+          console.log('Cliente foi desconectado', reason);
+          this.isConnected = false;
+          this.qrCode = null;
 
           // Aguardar antes de tentar limpar os arquivos
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
           try {
-            const sessionPath = path.resolve(
-              __dirname,
-              '..',
-              'sessions',
-              userId,
-            );
             await this.cleanSessionDirectory(sessionPath);
           } catch (error) {
             console.error('Erro ao limpar sessão após desconexão:', error);
@@ -104,14 +88,14 @@ export class WhatsappService {
       },
     );
   }
+
   private async cleanSessionDirectory(sessionPath: string) {
     try {
       if (
-        !(await new Promise((resolve) => {
-          fs.access(sessionPath, (err) => {
-            resolve(!err);
-          });
-        }))
+        !(await fs.promises
+          .access(sessionPath)
+          .then(() => true)
+          .catch(() => false))
       ) {
         return;
       }
@@ -119,12 +103,7 @@ export class WhatsappService {
       const deleteFile = async (filePath: string) => {
         for (let attempts = 0; attempts < 3; attempts++) {
           try {
-            await new Promise<void>((resolve, reject) => {
-              fs.unlink(filePath, (err) => {
-                if (err) reject(err);
-                else resolve();
-              });
-            });
+            await fs.promises.unlink(filePath);
             break;
           } catch (error) {
             if (attempts === 2)
@@ -142,38 +121,25 @@ export class WhatsappService {
         const fullPath = path.join(sessionPath, file.name);
         if (file.isDirectory()) {
           await this.cleanSessionDirectory(fullPath);
-          await new Promise<void>((resolve, reject) => {
-            fs.rmdir(fullPath, (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          }).catch(() => {});
-          await new Promise<void>((resolve, reject) => {
-            fs.rmdir(sessionPath, (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          }).catch(() => {});
+          await fs.promises.rmdir(fullPath).catch(() => {});
+        } else {
           await deleteFile(fullPath);
         }
       }
 
-      await new Promise<void>((resolve, reject) => {
-        fs.rmdir(sessionPath, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      }).catch(() => {});
+      await fs.promises.rmdir(sessionPath).catch(() => {});
     } catch (error) {
       console.error('Erro ao limpar diretório de sessão:', error);
     }
   }
-  async userIsReady(userId: string) {
-    return this.isConected.get(userId);
+
+  async userIsReady() {
+    return this.isConnected;
   }
-  // Obter grupos de um usuário específico
-  async getGroups(userId: string) {
-    const { client } = await this.initializeClient(userId);
+
+  // Obter grupos
+  async getGroups() {
+    const { client } = await this.initializeClient();
     const chats = await client.getChats();
     const groups = chats
       .filter((chat) => chat.isGroup)
@@ -184,9 +150,9 @@ export class WhatsappService {
     return groups;
   }
 
-  // Obter contatos de um grupo específico para um usuário
-  async getGroupContacts(userId: string, groupId: string) {
-    const { client } = await this.initializeClient(userId);
+  // Obter contatos de um grupo específico
+  async getGroupContacts(groupId: string) {
+    const { client } = await this.initializeClient();
     const chat = (await client.getChatById(groupId)) as GroupChat;
 
     if (!chat.isGroup) {
@@ -207,8 +173,8 @@ export class WhatsappService {
     return contacts;
   }
 
-  async getMessages(userId: string) {
-    const { client } = await this.initializeClient(userId);
+  async getMessages() {
+    const { client } = await this.initializeClient();
     const chats = await client.getChats();
     const messages = await Promise.all(
       chats.map(async (chat) => {
@@ -231,27 +197,24 @@ export class WhatsappService {
     return messages;
   }
 
-  // Obter QR code para um usuário específico
-  getQrCode(userId: string): string {
-    return this.qrCodes.get(userId);
+  // Obter QR code
+  getQrCode(): string {
+    return this.qrCode;
   }
 
-  async logout(userId: string) {
-    const { client } = await this.initializeClient(userId);
+  async logout() {
+    const { client } = await this.initializeClient();
 
     if (client) {
-      client.logout();
-      client.destroy();
-      this.clients.delete(userId);
-      this.qrCodes.delete(userId);
+      await client.logout();
+      await client.destroy();
+      this.isConnected = false;
+      this.qrCode = null;
     }
   }
-  async sendMessagesToContacts(
-    userId: string,
-    contacts: string[],
-    message: string,
-  ) {
-    const { client } = await this.initializeClient(userId);
+
+  async sendMessagesToContacts(contacts: string[], message: string) {
+    const { client } = await this.initializeClient();
 
     for (const contact of contacts) {
       // Inicia o envio das mensagens em paralelo sem bloquear
@@ -267,7 +230,7 @@ export class WhatsappService {
   ) {
     console.log(`Enviando mensagem para ${contact}...`);
     // Gera um atraso randômico entre 20 e 90 segundos
-    const minDelay = 1000; // 20 segundos
+    const minDelay = 20000; // 20 segundos
     const maxDelay = 90000; // 1 minuto e 30 segundos
     const delay =
       Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;

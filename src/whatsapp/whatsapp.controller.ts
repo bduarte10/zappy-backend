@@ -6,31 +6,21 @@ export class WhatsappController {
   constructor(private readonly whatsappService: WhatsappService) {}
 
   @Post('session')
-  async startSession(@Body('userId') userId: string) {
-    if (!userId || userId === '') {
-      return {
-        message: 'O userId não pode ser vazio',
-      };
-    }
-
+  async startSession() {
     try {
-      console.log(`Iniciando sessão para userId: ${userId}`);
-      const { qrCode, isReady } =
-        await this.whatsappService.initializeClient(userId);
+      console.log('Iniciando sessão');
+      const { qrCode, isReady } = await this.whatsappService.initializeClient();
       console.log('Resposta do initializeClient:', { qrCode, isReady });
 
       if (isReady) {
-        console.log(`Usuário ${userId} já está em sessão`);
+        console.log('Usuário já está em sessão');
         return {
           message: 'Usuário já está em sessão',
-          userId,
         };
       }
 
       const responseData = {
-        message:
-          'Iniciando sessão do WhatsApp para o usuário, favor scanear o QR code',
-        userId,
+        message: 'Iniciando sessão do WhatsApp, favor scanear o QR code',
         qrCode,
       };
       console.log('Resposta final:', {
@@ -44,95 +34,76 @@ export class WhatsappController {
     }
   }
 
-  @Get('messages/:userId')
-  async getMessages(@Param('userId') userId: string) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
+  @Get('messages')
+  async getMessages() {
+    const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
       return {
         message: 'Usuário não está em sessão',
-        userId,
       };
     }
-    const messages = await this.whatsappService.getMessages(userId);
-
+    const messages = await this.whatsappService.getMessages();
     return { messages };
   }
 
-  // Endpoint para obter todos os grupos do usuário
   @Post('groups')
-  async getGroups(@Body('userId') userId: string) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
+  async getGroups() {
+    const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
       return {
         message: 'Usuário não está em sessão',
-        userId,
       };
     }
-    const groups = await this.whatsappService.getGroups(userId);
+    const groups = await this.whatsappService.getGroups();
     return { groups };
   }
 
-  // Endpoint para obter contatos de um grupo específico
   @Post('groups/:groupId/contacts')
-  async getGroupContacts(
-    @Body('userId') userId: string,
-    @Param('groupId') groupId: string,
-  ) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
+  async getGroupContacts(@Param('groupId') groupId: string) {
+    const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
       return {
         message: 'Usuário não está em sessão',
-        userId,
       };
     }
-    const contacts = await this.whatsappService.getGroupContacts(
-      userId,
-      groupId,
-    );
+    const contacts = await this.whatsappService.getGroupContacts(groupId);
     return { contacts };
   }
 
-  //rota logout
   @Post('logout')
-  async logout(@Body('userId') userId: string) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
+  async logout() {
+    const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
       return {
         message: 'Usuário não está em sessão',
-        userId,
       };
     }
-    await this.whatsappService.logout(userId);
+    await this.whatsappService.logout();
     return { message: 'Usuário deslogado com sucesso' };
   }
 
   @Post('send-messages')
   async sendMessages(
-    @Body('userId') userId: string,
     @Body('contacts') contacts: string[],
     @Body('message') message: string,
   ) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
+    const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
       return {
         message: 'Usuário não está em sessão',
-        userId,
       };
     }
-    this.whatsappService.sendMessagesToContacts(userId, contacts, message);
+    this.whatsappService.sendMessagesToContacts(contacts, message);
     return {
       message: 'Mensagens estão sendo enviadas.',
-      userId,
     };
   }
 
-  @Get('status/:userId')
-  async getStatus(@Param('userId') userId: string) {
-    const isConnected = await this.whatsappService.userIsReady(userId);
-
+  @Get('status')
+  async getStatus() {
+    const isConnected = await this.whatsappService.userIsReady();
     return {
       status: isConnected ? 'true' : 'false',
-      userId,
     };
   }
 }
