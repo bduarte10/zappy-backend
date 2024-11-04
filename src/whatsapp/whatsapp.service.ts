@@ -10,20 +10,12 @@ export class WhatsappService {
   private qrCode: string;
   private isConnected: boolean = false;
 
-  // Inicializa o cliente WhatsApp
-  async initializeClient(): Promise<{
-    client: Client;
-    qrCode?: string;
-    isReady?: boolean;
-  }> {
-    if (this.client && this.isConnected) {
-      console.log('Cliente já inicializado');
-      return {
-        client: this.client,
-        isReady: true,
-      };
-    }
+  constructor() {
+    this.initializeClient();
+  }
 
+  // Inicializa o cliente WhatsApp
+  private async initializeClient() {
     const sessionPath = path.resolve(__dirname, '..', 'session');
 
     // Criar diretório se ele não existir
@@ -38,55 +30,47 @@ export class WhatsappService {
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-gpu',
+          // Adicione ou remova outras flags conforme necessário
         ],
       },
     });
 
-    return new Promise<{ client: Client; qrCode?: string; isReady?: boolean }>(
-      (resolve, reject) => {
-        this.client.initialize();
+    this.client.on('qr', (qr) => {
+      console.log('QR code gerado:');
+      qrcode.generate(qr, { small: true });
+      this.qrCode = qr;
+    });
 
-        this.client.on('qr', (qr) => {
-          console.log('QR code gerado:');
-          qrcode.generate(qr, { small: true });
-          this.qrCode = qr;
-          // Retorna o QR code imediatamente para o usuário
-          resolve({ client: this.client, qrCode: qr, isReady: false });
-        });
+    this.client.on('ready', () => {
+      console.log('WhatsApp está pronto!');
+      this.isConnected = true;
+      this.qrCode = null;
+    });
 
-        this.client.on('ready', () => {
-          console.log('WhatsApp está pronto!');
-          this.isConnected = true;
-          this.qrCode = null;
-          resolve({ client: this.client, isReady: true });
-        });
+    this.client.on('auth_failure', (msg) => {
+      console.error('Falha na autenticação:', msg);
+      this.isConnected = false;
+    });
 
-        this.client.on('auth_failure', (msg) => {
-          console.error('Falha na autenticação:', msg);
-          reject(new Error('Falha na autenticação'));
-        });
+    this.client.on('disconnected', async (reason) => {
+      console.log('Cliente foi desconectado', reason);
+      this.isConnected = false;
+      this.qrCode = null;
 
-        this.client.on('disconnected', async (reason) => {
-          console.log('Cliente foi desconectado', reason);
-          this.isConnected = false;
-          this.qrCode = null;
+      // Aguardar antes de tentar limpar os arquivos
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          // Aguardar antes de tentar limpar os arquivos
-          await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        await this.cleanSessionDirectory(sessionPath);
+      } catch (error) {
+        console.error('Erro ao limpar sessão após desconexão:', error);
+      }
 
-          try {
-            await this.cleanSessionDirectory(sessionPath);
-          } catch (error) {
-            console.error('Erro ao limpar sessão após desconexão:', error);
-          }
-        });
-      },
-    );
+      // Reinicializar o cliente após a desconexão
+      this.initializeClient();
+    });
+
+    this.client.initialize();
   }
 
   private async cleanSessionDirectory(sessionPath: string) {
@@ -139,8 +123,10 @@ export class WhatsappService {
 
   // Obter grupos
   async getGroups() {
-    const { client } = await this.initializeClient();
-    const chats = await client.getChats();
+    if (!this.isConnected) {
+      throw new Error('Cliente não está conectado');
+    }
+    const chats = await this.client.getChats();
     const groups = chats
       .filter((chat) => chat.isGroup)
       .map((group) => ({
@@ -152,8 +138,10 @@ export class WhatsappService {
 
   // Obter contatos de um grupo específico
   async getGroupContacts(groupId: string) {
-    const { client } = await this.initializeClient();
-    const chat = (await client.getChatById(groupId)) as GroupChat;
+    if (!this.isConnected) {
+      throw new Error('Cliente não está conectado');
+    }
+    const chat = (await this.client.getChatById(groupId)) as GroupChat;
 
     if (!chat.isGroup) {
       throw new Error('O chat selecionado não é um grupo.');
@@ -161,7 +149,9 @@ export class WhatsappService {
 
     const contacts = await Promise.all(
       chat.participants.map(async (participant) => {
-        const contact = await client.getContactById(participant.id._serialized);
+        const contact = await this.client.getContactById(
+          participant.id._serialized,
+        );
         return {
           id: participant.id._serialized,
           name: contact.pushname || contact.number,
@@ -174,8 +164,10 @@ export class WhatsappService {
   }
 
   async getMessages() {
-    const { client } = await this.initializeClient();
-    const chats = await client.getChats();
+    if (!this.isConnected) {
+      throw new Error('Cliente não está conectado');
+    }
+    const chats = await this.client.getChats();
     const messages = await Promise.all(
       chats.map(async (chat) => {
         const chatMessages = await chat.fetchMessages({ limit: 10 });
@@ -203,31 +195,27 @@ export class WhatsappService {
   }
 
   async logout() {
-    const { client } = await this.initializeClient();
-
-    if (client) {
-      await client.logout();
-      await client.destroy();
+    if (this.client) {
+      await this.client.logout();
+      await this.client.destroy();
       this.isConnected = false;
       this.qrCode = null;
     }
   }
 
   async sendMessagesToContacts(contacts: string[], message: string) {
-    const { client } = await this.initializeClient();
+    if (!this.isConnected) {
+      throw new Error('Cliente não está conectado');
+    }
 
     for (const contact of contacts) {
       // Inicia o envio das mensagens em paralelo sem bloquear
-      this.sendMessageWithRandomDelay(client, contact, message);
+      this.sendMessageWithRandomDelay(contact, message);
     }
   }
 
   // Função auxiliar para enviar mensagem com atraso randômico
-  private async sendMessageWithRandomDelay(
-    client: Client,
-    contact: string,
-    message: string,
-  ) {
+  private async sendMessageWithRandomDelay(contact: string, message: string) {
     console.log(`Enviando mensagem para ${contact}...`);
     // Gera um atraso randômico entre 20 e 90 segundos
     const minDelay = 20000; // 20 segundos
@@ -239,7 +227,7 @@ export class WhatsappService {
     await new Promise((resolve) => setTimeout(resolve, delay));
 
     // Enviar a mensagem
-    client
+    this.client
       .sendMessage(contact, message)
       .then(() => {
         console.log(

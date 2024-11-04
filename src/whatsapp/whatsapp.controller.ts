@@ -7,30 +7,21 @@ export class WhatsappController {
 
   @Get('session')
   async startSession() {
-    try {
-      console.log('Iniciando sessão');
-      const { qrCode, isReady } = await this.whatsappService.initializeClient();
-      console.log('Resposta do initializeClient:', { qrCode, isReady });
+    const isConnected = await this.whatsappService.userIsReady();
 
-      if (isReady) {
-        console.log('Usuário já está em sessão');
-        return {
-          message: 'Usuário já está em sessão',
-        };
-      }
-
-      const responseData = {
-        message: 'Iniciando sessão do WhatsApp, favor scanear o QR code',
-        qrCode,
+    if (isConnected) {
+      return {
+        message: 'Usuário já está em sessão',
       };
-      console.log('Resposta final:', {
-        ...responseData,
-        qrCodeLength: qrCode ? qrCode.length : 0,
-      });
-      return responseData;
-    } catch (error) {
-      console.error('Erro ao iniciar sessão:', error);
-      throw error;
+    }
+
+    const qrCode = this.whatsappService.getQrCode();
+    if (qrCode) {
+      return { qrCode, message: 'Escanear QR code para iniciar sessão' };
+    } else {
+      return {
+        message: 'QR code ainda não está disponível, tente novamente em breve',
+      };
     }
   }
 
