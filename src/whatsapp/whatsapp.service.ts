@@ -16,15 +16,8 @@ export class WhatsappService {
 
   // Inicializa o cliente WhatsApp
   private async initializeClient() {
-    const sessionPath = path.resolve(__dirname, '..', 'session');
-
-    // Criar diretório se ele não existir
-    if (!fs.existsSync(sessionPath)) {
-      fs.mkdirSync(sessionPath, { recursive: true });
-    }
-
     this.client = new Client({
-      authStrategy: new LocalAuth({ dataPath: sessionPath }),
+      authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
         args: [
@@ -53,21 +46,12 @@ export class WhatsappService {
     });
 
     this.client.on('disconnected', async (reason) => {
-      console.log('Cliente foi desconectado', reason);
+      console.error('WhatsApp desconectado:', reason);
       this.isConnected = false;
-      this.qrCode = null;
 
-      // Aguardar antes de tentar limpar os arquivos
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      try {
-        await this.cleanSessionDirectory(sessionPath);
-      } catch (error) {
-        console.error('Erro ao limpar sessão após desconexão:', error);
-      }
-
-      // Reinicializar o cliente após a desconexão
-      this.initializeClient();
+      // Limpar o diretório de sessão
+      const sessionPath = path.join(__dirname, '..', 'sessions');
+      await this.cleanSessionDirectory(sessionPath);
     });
 
     this.client.initialize();
