@@ -39,6 +39,10 @@ export class WhatsappService {
 
     const client = new Client({
       authStrategy: new LocalAuth({ clientId: userId, dataPath: sessionPath }),
+      puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      },
     });
 
     this.clients.set(userId, client);
