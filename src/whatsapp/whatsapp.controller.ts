@@ -12,20 +12,36 @@ export class WhatsappController {
         message: 'O userId não pode ser vazio',
       };
     }
-    const { qrCode, isReady } =
-      await this.whatsappService.initializeClient(userId);
-    if (isReady) {
-      return {
-        message: 'Usuário já está em sessão',
+
+    try {
+      console.log(`Iniciando sessão para userId: ${userId}`);
+      const { qrCode, isReady } =
+        await this.whatsappService.initializeClient(userId);
+      console.log('Resposta do initializeClient:', { qrCode, isReady });
+
+      if (isReady) {
+        console.log(`Usuário ${userId} já está em sessão`);
+        return {
+          message: 'Usuário já está em sessão',
+          userId,
+        };
+      }
+
+      const responseData = {
+        message:
+          'Iniciando sessão do WhatsApp para o usuário, favor scanear o QR code',
         userId,
+        qrCode,
       };
+      console.log('Resposta final:', {
+        ...responseData,
+        qrCodeLength: qrCode ? qrCode.length : 0,
+      });
+      return responseData;
+    } catch (error) {
+      console.error('Erro ao iniciar sessão:', error);
+      throw error;
     }
-    return {
-      message:
-        'Iniciando sessão do WhatsApp para o usuário, favor scanear o QR code',
-      userId,
-      qrCode,
-    };
   }
 
   @Get('messages/:userId')
