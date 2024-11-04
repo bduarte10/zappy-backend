@@ -41,7 +41,16 @@ export class WhatsappService {
       authStrategy: new LocalAuth({ clientId: userId, dataPath: sessionPath }),
       puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process', // <- this one doesn't works in Windows
+          '--disable-gpu',
+        ],
       },
     });
 
