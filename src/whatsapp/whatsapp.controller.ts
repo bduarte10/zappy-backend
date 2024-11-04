@@ -5,7 +5,7 @@ import { WhatsappService } from './whatsapp.service';
 export class WhatsappController {
   constructor(private readonly whatsappService: WhatsappService) {}
 
-  @Post('session')
+  @Get('session')
   async startSession() {
     try {
       console.log('Iniciando sessão');
@@ -46,7 +46,7 @@ export class WhatsappController {
     return { messages };
   }
 
-  @Post('groups')
+  @Get('groups')
   async getGroups() {
     const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
@@ -58,7 +58,7 @@ export class WhatsappController {
     return { groups };
   }
 
-  @Post('groups/:groupId/contacts')
+  @Get('groups/:groupId/contacts')
   async getGroupContacts(@Param('groupId') groupId: string) {
     const isConnected = await this.whatsappService.userIsReady();
     if (!isConnected) {
