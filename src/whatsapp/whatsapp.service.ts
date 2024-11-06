@@ -3,8 +3,6 @@ import { Client, GroupChat, LocalAuth } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Browser, computeExecutablePath } from '@puppeteer/browsers';
-import puppeteer from 'puppeteer';
 
 // import { computeExecutablePath, Browser } from '@puppeteer/browsers';
 
@@ -13,20 +11,12 @@ export class WhatsappService {
   private client: Client;
   private qrCode: string;
   private isConnected: boolean = false;
+  private chromePath: string =
+    '/root/.cache/puppeteer/chrome/linux-130.0.6723.91/chrome-linux64/chrome';
 
   constructor() {
     this.initializeClient();
-    console.log('Chrome Path:', this.version);
   }
-
-  chromeExecutablePath = puppeteer.executablePath();
-  version = this.chromeExecutablePath;
-
-  ChromePath = computeExecutablePath({
-    browser: Browser.CHROME,
-    buildId: this.version,
-    cacheDir: path.join(__dirname, '../../'),
-  });
 
   // Inicializa o cliente WhatsApp
   private async initializeClient() {
@@ -34,7 +24,7 @@ export class WhatsappService {
       authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
-        executablePath: this.ChromePath,
+        executablePath: this.chromePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
