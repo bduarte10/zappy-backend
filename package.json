@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "npx @puppeteer/browsers install chrome@130.0.6723.93 && nest build",
+    "build": "npx @puppeteer/browsers install chrome@latest && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

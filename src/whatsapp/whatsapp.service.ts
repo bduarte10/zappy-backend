@@ -4,6 +4,7 @@ import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Browser, computeExecutablePath } from '@puppeteer/browsers';
+import puppeteer from 'puppeteer';
 
 // import { computeExecutablePath, Browser } from '@puppeteer/browsers';
 
@@ -15,11 +16,15 @@ export class WhatsappService {
 
   constructor() {
     this.initializeClient();
+    console.log('Chrome Path:', this.version);
   }
+
+  chromeExecutablePath = puppeteer.executablePath();
+  version = this.chromeExecutablePath.split('chrome')[1].split(path.sep)[1];
 
   ChromePath = computeExecutablePath({
     browser: Browser.CHROME,
-    buildId: '130.0.6723.93',
+    buildId: this.version,
     cacheDir: path.join(__dirname, '../../'),
   });
 
