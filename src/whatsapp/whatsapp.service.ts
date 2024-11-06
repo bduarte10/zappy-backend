@@ -4,9 +4,6 @@ import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Browser, computeExecutablePath } from '@puppeteer/browsers';
-import puppeteer from 'puppeteer';
-
-// import { computeExecutablePath, Browser } from '@puppeteer/browsers';
 
 @Injectable()
 export class WhatsappService {
