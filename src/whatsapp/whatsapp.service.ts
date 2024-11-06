@@ -25,9 +25,13 @@ export class WhatsappService {
       puppeteer: {
         headless: true,
         executablePath: this.chromePath,
+        timeout: 60000,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
+
+          '--no-zygote',
+
           // Adicione ou remova outras flags conforme necessário
         ],
       },

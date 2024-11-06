@@ -16,13 +16,10 @@ export class WhatsappController {
     }
 
     const qrCode = this.whatsappService.getQrCode();
-    if (qrCode) {
-      return { qrCode, message: 'Escanear QR code para iniciar sessão' };
-    } else {
-      return {
-        message: 'QR code ainda não está disponível, tente novamente em breve',
-      };
-    }
+    return {
+      message: `Escaneie o QR Code gerado: ${qrCode}`,
+      qrCode,
+    };
   }
 
   @Get('messages')
