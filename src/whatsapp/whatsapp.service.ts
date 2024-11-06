@@ -16,15 +16,11 @@ export class WhatsappService {
 
   constructor() {
     this.initializeClient();
-    console.log('Chrome Path:', this.version);
   }
-
-  chromeExecutablePath = puppeteer.executablePath();
-  version = this.chromeExecutablePath.split('chrome')[1].split(path.sep)[1];
 
   ChromePath = computeExecutablePath({
     browser: Browser.CHROME,
-    buildId: this.version,
+    buildId: '130.0.6723.91',
     cacheDir: path.join(__dirname, '../../'),
   });
 
