@@ -3,6 +3,9 @@ import { Client, GroupChat, LocalAuth } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Browser, computeExecutablePath } from '@puppeteer/browsers';
+
+// import { computeExecutablePath, Browser } from '@puppeteer/browsers';
 
 @Injectable()
 export class WhatsappService {
@@ -14,12 +17,19 @@ export class WhatsappService {
     this.initializeClient();
   }
 
+  ChromePath = computeExecutablePath({
+    browser: Browser.CHROME,
+    buildId: '130.0.6723.93',
+    cacheDir: path.join(__dirname, '../../'),
+  });
+
   // Inicializa o cliente WhatsApp
   private async initializeClient() {
     this.client = new Client({
       authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
+        executablePath: this.ChromePath,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',

@@ -14,6 +14,7 @@ lerna-debug.log*
 
 /.wwebjs_auth
 /.wwebjs_cache
+/chrome
 
 # OS
 .DS_Store
