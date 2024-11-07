@@ -11,8 +11,6 @@ export class WhatsappService {
   private client: Client;
   private qrCode: string;
   private isConnected: boolean = false;
-  private chromePath: string =
-    '/root/.cache/puppeteer/chrome/linux-130.0.6723.91/chrome-linux64/chrome';
 
   constructor() {
     this.initializeClient();
@@ -24,8 +22,6 @@ export class WhatsappService {
       authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
-        executablePath: this.chromePath,
-        timeout: 60000,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--no-zygote'],
       },
     });
