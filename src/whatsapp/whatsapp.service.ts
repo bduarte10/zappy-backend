@@ -11,6 +11,7 @@ export class WhatsappService {
   private client: Client;
   private qrCode: string;
   private isConnected: boolean = false;
+  public isDestroyed: boolean = false;
 
   constructor() {
     this.initializeClient();
@@ -27,7 +28,7 @@ export class WhatsappService {
     });
 
     this.client.on('qr', (qr) => {
-      console.log('QR code gerado:');
+      console.log(`QR code gerado: ${qr}`);
       qrcode.generate(qr, { small: true });
       this.qrCode = qr;
     });
@@ -53,6 +54,18 @@ export class WhatsappService {
     });
 
     this.client.initialize();
+    setTimeout(
+      () => {
+        if (!this.isConnected) {
+          console.error(
+            'Cliente não ficou pronto em 3 minutos, fechando o cliente...',
+          );
+          this.client.destroy();
+          this.isDestroyed = true;
+        }
+      },
+      0.5 * 60 * 1000,
+    );
   }
 
   private async cleanSessionDirectory(sessionPath: string) {
@@ -116,6 +129,12 @@ export class WhatsappService {
         name: group.name,
       }));
     return groups;
+  }
+
+  async restartClient() {
+    this.isDestroyed = false;
+    this.qrCode = null;
+    await this.initializeClient();
   }
 
   // Obter contatos de um grupo específico

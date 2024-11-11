@@ -14,8 +14,19 @@ export class WhatsappController {
         message: 'Usuário já está em sessão',
       };
     }
+    if (this.whatsappService.isDestroyed) {
+      await this.whatsappService.restartClient();
+      return {
+        message: 'Sessão reiniciada',
+      };
+    }
 
     const qrCode = this.whatsappService.getQrCode();
+    if (!qrCode) {
+      return {
+        message: 'Gerando QR Code...',
+      };
+    }
     return {
       message: `Escaneie o QR Code gerado: ${qrCode}`,
       qrCode,
