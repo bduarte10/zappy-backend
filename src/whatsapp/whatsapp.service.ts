@@ -64,7 +64,7 @@ export class WhatsappService {
           this.isDestroyed = true;
         }
       },
-      0.5 * 60 * 1000,
+      1.5 * 60 * 1000,
     );
   }
 
