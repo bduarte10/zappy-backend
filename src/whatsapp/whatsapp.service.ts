@@ -122,12 +122,15 @@ export class WhatsappService {
       throw new Error('Cliente não está conectado');
     }
     const chats = await this.client.getChats();
+    console.log(chats);
     const groups = chats
       .filter((chat) => chat.isGroup)
       .map((group) => ({
         id: group.id._serialized,
         name: group.name,
       }));
+    console.log(groups);
+
     return groups;
   }
 
