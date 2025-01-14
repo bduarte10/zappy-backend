@@ -1,0 +1,17 @@
+
+services:
+  zappy_postgresql:
+    image: bitnami/postgresql:latest
+    container_name: zappy_postgresql
+    environment:
+      - POSTGRESQL_USERNAME=bduarte
+      - POSTGRESQL_PASSWORD=bduarte10
+      - POSTGRESQL_DATABASE=zappy_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql_data:/bitnami/postgresql
+
+volumes:
+  postgresql_data:
+    driver: local
