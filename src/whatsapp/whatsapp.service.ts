@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Client, GroupChat, LocalAuth } from 'whatsapp-web.js';
+import { Client, GroupChat, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import * as qrcode from 'qrcode-terminal';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -122,12 +122,15 @@ export class WhatsappService {
       throw new Error('Cliente não está conectado');
     }
     const chats = await this.client.getChats();
+    console.log(chats);
     const groups = chats
       .filter((chat) => chat.isGroup)
       .map((group) => ({
         id: group.id._serialized,
         name: group.name,
       }));
+    console.log(groups);
+
     return groups;
   }
 
@@ -213,6 +216,65 @@ export class WhatsappService {
       // Inicia o envio das mensagens em paralelo sem bloquear
       this.sendMessageWithRandomDelay(contact, message);
     }
+  }
+
+  async sendAudioMessages(formData: FormData) {
+    if (!this.isConnected) {
+      throw new Error('Cliente não está conectado');
+    }
+    if (!(formData instanceof FormData)) {
+      throw new TypeError('formData não é um objeto FormData');
+    }
+
+    const contactIds = formData.get('contactIds');
+    if (typeof contactIds !== 'string') {
+      throw new TypeError('contactIds não é uma string');
+    }
+
+    const contacts = JSON.parse(contactIds);
+    const file = formData.get('audio');
+    if (!(file instanceof File)) {
+      throw new Error('Você deve fornecer um arquivo de áudio');
+    }
+    const audioFileBuffer = await file.arrayBuffer();
+
+    // Converte o ArrayBuffer para base64
+    const base64Audio = Buffer.from(audioFileBuffer).toString('base64');
+    const mimeType = file.type;
+
+    // Cria uma instância de MessageMedia
+    const media = new MessageMedia(mimeType, base64Audio, file.name);
+
+    // Continue com o processamento do áudio e envio das mensagens
+    for (const contact of contacts) {
+      // Envia a mídia com atraso randômico
+      this.sendMediaWithRandomDelay(contact, media);
+    }
+  }
+
+  private async sendMediaWithRandomDelay(
+    contact: string,
+    media: MessageMedia,
+    caption?: string,
+  ) {
+    console.log(`Enviando mídia para ${contact}...`);
+    const minDelay = 20000; // 20 segundos
+    const maxDelay = 90000; // 1 minuto e 30 segundos
+    const delay =
+      Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    this.client
+      .sendMessage(contact, media, { caption })
+      .then(() => {
+        console.log(
+          `Mídia enviada para ${contact} após ${delay / 1000} segundos.`,
+        );
+      })
+      .catch((error) => {
+        console.error(`Erro ao enviar mídia para ${contact}:`, error);
+      });
   }
 
   // Função auxiliar para enviar mensagem com atraso randômico

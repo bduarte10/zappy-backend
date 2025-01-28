@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { WhatsappService } from './whatsapp.service';
 
 @Controller('/')
@@ -96,6 +105,26 @@ export class WhatsappController {
     return {
       message: 'Mensagens estão sendo enviadas.',
     };
+  }
+
+  @Post('send-audio-messages')
+  @UseInterceptors(FileInterceptor('audio'))
+  async sendAudioMessages(
+    @UploadedFile() audio: Express.Multer.File,
+    @Body('contactIds') contactIds: string,
+  ) {
+    if (!audio) {
+      throw new Error('Arquivo de áudio não fornecido');
+    }
+
+    const formData = new FormData();
+    formData.append(
+      'audio',
+      new Blob([audio.buffer], { type: audio.mimetype }),
+    );
+    formData.append('contactIds', contactIds);
+
+    await this.whatsappService.sendAudioMessages(formData);
   }
 
   @Get('status')
