@@ -58,13 +58,13 @@ export class WhatsappService {
       () => {
         if (!this.isConnected) {
           console.error(
-            'Cliente não ficou pronto em 3 minutos, fechando o cliente...',
+            'Cliente não ficou pronto em 5 minutos, fechando o cliente...',
           );
           this.client.destroy();
           this.isDestroyed = true;
         }
       },
-      1.5 * 60 * 1000,
+      5 * 60 * 1000,
     );
   }
 
